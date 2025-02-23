@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="{{ csrf_token }}" />
+    <title>wattsapp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .thinking-dot:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .thinking-dot:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+    </style>
+  </head>
+  <body class="bg-[#E7FCE3]/40">
+    <main class="max-w-md mx-auto my-8">
+      <!-- Chat container with phone frame -->
+      <div class="bg-black rounded-[60px] h-max w-max p-4 shadow-xl">
+        <div class="rounded-[45px] h-[730px] w-[340px] relative overflow-hidden bg-[url('/static/whatsapp-bg.jpg')] bg-cover bg-center">
+          <div class="absolute inset-0 z-0"></div>
+
+          <div class="relative z-10 h-full">
+            <div class="absolute top-0 left-1/2 transform -translate-x-1/2 h-6 w-40 bg-black rounded-b-2xl"></div>
+
+            <div class="h-full pt-8 pb-16 flex flex-col">
+              <!-- Messages container -->
+              <div class="flex-1 overflow-y-auto px-4">
+                <div id="messages"></div>
+
+                <!-- Typing indicator -->
+                <div id="thinking" class="hidden">
+                  <div class="flex justify-start mb-4">
+                    <div class="max-w-[70%] rounded-lg px-3 py-2 shadow-sm bg-white">
+                      <div class="flex gap-2 items-center opacity-0 translate-y-2 transition-all duration-700 ease-in-out">
+                        <div class="w-7 h-7 rounded-full bg-gray-200 overflow-hidden">
+                          <img src="/static/avatar.png" alt="AI Avatar" class="w-full h-full object-cover" />
+                        </div>
+                        <span class="text-sm">pondering</span>
+                        <div class="thinking">
+                          <span class="thinking-dot inline-block animate-[bounce_1.4s_infinite]">.</span>
+                          <span class="thinking-dot inline-block animate-[bounce_1.4s_infinite]">.</span>
+                          <span class="thinking-dot inline-block animate-[bounce_1.4s_infinite]">.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Message input form -->
+              <div class="p-4 border-t bg-[#F0F2F5] -mb-[4rem] h-[6rem]">
+                <form id="chat-form" class="flex gap-1">
+                  <input id="message" type="text" class="shadow-sm flex-1 text-sm rounded-lg px-3 py-2 border focus:outline-none focus:border-gray-200" placeholder="Type a message..." />
+                  <button type="submit" class="bg-[#F0F2F5] text-[#B2B9C0] rounded-md p-2 active:bg-gray-200 transition-colors duration-150 active:scale-95 transform">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round">
+                      <path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z" />
+                      <path d="M6 12h16" />
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      // DOM elements
+      const form = document.getElementById("chat-form");
+      const input = document.getElementById("message");
+      const messages = document.getElementById("messages");
+      const thinking = document.getElementById("thinking");
+      const scrollContainer = messages.parentElement;
+
+      let isFirstMessage = true;
+
+      // Message template generator
+      function createMessageHTML(content, isUser) {
+        return `
+        <div class="flex max-w-[90%]">
+          ${
+            !isUser
+              ? `
+            <div class="flex-shrink-0 -mr-1 z-10">
+              <div class="avatar w-8 h-8 rounded-full bg-gray-200 overflow-hidden transition-all duration-700 ease-in-out opacity-0">
+                <img src="/static/avatar.png" alt="AI Avatar" class="w-full h-full object-cover">
+              </div>
+            </div>
+          `
+              : ""
+          }
+          <div class="content text-sm rounded-lg px-3 py-2 shadow-sm ${isUser ? "bg-[#D9FDD2]" : "bg-white"} transition-all duration-700 ease-in-out transform translate-y-2 opacity-0">
+            ${content}
+          </div>
+        </div>
+      `;
+      }
+
+      // Message handling functions
+      async function appendMessage(content, isUser = false) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `flex ${isUser ? "justify-end text-left" : "justify-start"} -ml-1 mb-4`;
+        messageDiv.innerHTML = createMessageHTML(content, isUser);
+
+        const appendDelay = isFirstMessage ? 200 : 0;
+
+        setTimeout(() => {
+          messages.appendChild(messageDiv);
+          setTimeout(() => {
+            messageDiv.querySelector(".content").classList.remove("translate-y-2", "opacity-0");
+            const avatar = messageDiv.querySelector(".avatar");
+            if (avatar) avatar.classList.remove("opacity-0");
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }, 50);
+        }, appendDelay);
+
+        isFirstMessage = false;
+        return new Promise((resolve) => setTimeout(resolve, 300));
+      }
+
+      function toggleThinking(show) {
+        thinking.classList.toggle("hidden", !show);
+        const content = thinking.querySelector(".flex.gap-2");
+        content.classList.toggle("opacity-0", !show);
+        content.classList.toggle("translate-y-2", !show);
+        if (show) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+
+      // Chat form submission handler
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const message = input.value.trim();
+        if (!message) return;
+
+        input.value = "";
+        await appendMessage(message, true);
+        setTimeout(() => toggleThinking(true), 200);
+
+        try {
+          const response = await fetch("/chat/model", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content,
+            },
+            credentials: "same-origin",
+            body: `message=${encodeURIComponent(message)}`,
+          });
+
+          toggleThinking(false);
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const text = decoder.decode(value);
+            for (const chunk of text.split("\n\n")) {
+              if (chunk.trim()) await appendMessage(chunk.trim());
+            }
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          toggleThinking(false);
+          await appendMessage("Sorry, something went wrong.");
+        }
+      });
+    </script>
+  </body>
+</html>
